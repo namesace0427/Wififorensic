@@ -1,6 +1,6 @@
 import sys
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QPushButton,QMessageBox,QRadioButton,QComboBox,QTextBrowser
-
+import os
 
 class MyApp(QWidget):
 
@@ -14,25 +14,59 @@ class MyApp(QWidget):
         self.wifiuse={}
         self.wificonnect={}
         self.wificonnectlist=[]
+        self.latestwificonnectlist=[]
         self.forensic()
         self.initUI()
 
     def forensic(self):
-        self.wifiuse['SoMa Center']=[119745,[[0,0,0,31122,72434],[0,0,0,3,8],[0,229536,0,67747,86841],[0,1,0,7,38]]]
-        self.wifiuse['olleh_GiGA_WiFi_0CB6']=[233544,[[0,0,0,18848,27064],[0,0,0,2,1],[0,0,28564,75520,154647],[0,0,9,15,10]]]
-        self.wifiuse['조영호의 iPhone']=[25996,[[0,0,0,0,0],[0,0,0,0,0],[0,2276,0,11913,82851],[0,2,0,8,10]]]
-        self.wifiuse['U+zone']=[5521,[[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,21656],[0,0,0,0,3]]]
-        self.wifiuse['KHU Wi-Fi']=[9733,[[0,0,0,0,0],[0,0,0,0,0],[0,0,5992,19260,32971],[0,0,1,5,5]]]
+        dir = './log'
 
-        self.wificonnect['2022-11-09 02:11:42']=[['KT_WiFi_5G_417E','88:3c:1c:7c:41:81'],['[air purifier]_E30AJT1013042H','40:ca:63:68:ba:4c'],['SK_WiFiGIGA93EE','b4:a9:4f:c4:93:f1'],
-        ['SK_WiFiGIGA93EE_2.4G','c6:a9:4f:c4:93:f1'],['KT_GiGA_2G_Wave2_152A','00:07:89:d3:15:2d'],['U+NetEDE8','80:ca:4b:2b:ed:ea'],['KT_GiGA_5G_02','60:29:d5:3e:02:98'],['ww2_5G','70:5d:cc:e9:ff:b4'],
-        ['iptime5G','88:36:6c:6e:ae:5a']]
+        files = os.listdir(dir)
+        log_file = []
+
+        for file in files:
+            name, ext = os.path.splitext(file)
+            if ext == ".log":
+                if "dumpState" in name:
+                    log_file.append(file)
+        if len(log_file) == 0:
+            exit(0)
+        log_data=[]
+        print(log_file[0])
+        f = open(dir + "/" + log_file[0], 'r', encoding="UTF-8")
+        while True:
+            line = f.readline()
+            if not line: break
+            log_data.append(line)
+        f.close()
+        # WifiConfigManagerStartLine = log_data.index("WifiConfigManager - Configured networks Begin ----\n")
+        # WifiConfigManagerEndLine = log_data.index("WifiConfigManager - Configured networks End ----\n")
+        WifiConnectivityManagerStartLine = log_data.index("WifiConnectivityManager - Log Begin ----\n")
+        WifiConnectivityManagerEndLine = log_data.index("WifiConnectivityManager - Log End ----\n")
+        LatestScanResultsStart = log_data.index("Latest scan results:\n")
+        WifiHealthMonitorStart = log_data.index("WifiHealthMonitor - Log Begin ----\n")
+        WifiHealthMonitorEnd = log_data.index("WifiHealthMonitor - Log End ----\n")
+
+        for i in range(LatestScanResultsStart+2,LatestScanResultsStart+24):
+            self.latestwificonnectlist.append([log_data[i][2:20],log_data[i][64:90].strip()])
+        
+        for i in range(WifiConnectivityManagerStartLine+1,WifiConnectivityManagerEndLine):
+            if "Networks filtered out due to low signal strength" in log_data[i]:
+                index = log_data[i][:19].replace('T',' ')
+                self.wificonnect[index]=log_data[i][79:].split('/')
+
+        for i in range(WifiHealthMonitorStart+1,WifiHealthMonitorEnd):
+            if "SSID:" in log_data[i]:
+                index = log_data[i][7:-2]
+                time_st = log_data[i+2].index("ConnectDurSec:")
+                time_en = log_data[i+2].index("AssocRej:")
+                self.wifiuse[index] = [log_data[i+2][time_st+15:time_en],[log_data[i+10][11:],log_data[i+11][9:],log_data[i+12][11:],log_data[i+13][9:]]]
+        
+        self.log_collect = log_data[1][14:]
+        self.log_Network = log_data[8][9:]
+        self.log_upTime = log_data[13][11:]
 
         self.wificonnectlist=[['11-09 02:08:10','U+zone','Disconnect'],['11-09 02:21:13.401','SoMa Center','Connect']]
-
-# '2022-11-09 02:17:44'
-# '2022-11-09 02:21:13'
-# '2022-11-09 02:31:17'
 
     def initUI(self):
         self.btn1 = QPushButton('분석 대상 기기\n기초 정보', self)
@@ -60,7 +94,7 @@ class MyApp(QWidget):
         self.label1.setHidden(True)
         self.btn1_group.append(self.label1)
         
-        self.label2 = QLabel('2022-11-09 03:09:00',self)
+        self.label2 = QLabel(self.log_collect,self)
         self.label2.move(200,60)
         self.label2.setHidden(True)
         self.btn1_group.append(self.label2)
@@ -70,7 +104,7 @@ class MyApp(QWidget):
         self.label3.setHidden(True)
         self.btn1_group.append(self.label3)
         
-        self.label4 = QLabel('LG U+',self)
+        self.label4 = QLabel(self.log_Network,self)
         self.label4.move(200,100)
         self.label4.setHidden(True)
         self.btn1_group.append(self.label4)
@@ -80,7 +114,7 @@ class MyApp(QWidget):
         self.label5.setHidden(True)
         self.btn1_group.append(self.label5)
         
-        self.label6 = QLabel('0 week(s), 1 day(s), 12 hour(s), 38 minute(s)',self)
+        self.label6 = QLabel(self.log_upTime,self)
         self.label6.move(200,140)
         self.label6.setHidden(True)
         self.btn1_group.append(self.label6)
@@ -90,12 +124,15 @@ class MyApp(QWidget):
         self.label7.setHidden(True)
         self.btn2_group.append(self.label7)
 
-        self.label8 = QLabel('SoMa Center\nskiptime\nDTD 5G\nhanseo\nKT_GiGA_46FC\n \
-iptmie\nRM418\nSoma_iot\nhanseo5G\niptime\nsl\nU+NetCFC0_5G\nDS\nSoMa Center\n \
-KT_GiGA_E955\nKT_GiGA_FDE9\nFREE_U+zone\nKT_GiGA_5G_Wave2_7328\nKT_GiGA_5G_Wave2_2B85\n',self)
-        self.label8.move(20,100)
-        self.label8.setHidden(True)
-        self.btn2_group.append(self.label8)
+        self.tb5 = QTextBrowser(self)
+        self.tb5.setHidden(True)
+        self.tb5.resize(500,400)
+        self.tb5.move(20,100)
+        self.tb5.setAcceptRichText(True)
+        self.tb5.setOpenExternalLinks(True)
+        for p in  self.latestwificonnectlist:
+            self.tb5.append(p[1].__str__() + " : " + p[0].__str__())
+        self.btn2_group.append(self.tb5)
 
         self.cb = QComboBox(self)
         self.cb.addItem("SoMa Center")
@@ -119,32 +156,34 @@ KT_GiGA_E955\nKT_GiGA_FDE9\nFREE_U+zone\nKT_GiGA_5G_Wave2_7328\nKT_GiGA_5G_Wave2
         self.btn3_group.append(self.tb)
 
         self.tb2 = QTextBrowser(self)
-        self.tb2.setHidden(True)
+        self.tb2.resize(500,350)
         self.tb2.move(20,150)
+        self.tb2.setHidden(True)
         self.btn3_group.append(self.tb2)
 
         self.cb2 = QComboBox(self)
-        self.cb2.addItem('2022-11-09 02:11:42')
-        self.cb2.addItem('2022-11-09 02:17:44')
-        self.cb2.addItem('2022-11-09 02:21:13')
-        self.cb2.addItem('2022-11-09 02:31:17')
+        for p in self.wificonnect.keys():
+            self.cb2.addItem(p)
         self.cb2.setHidden(True)
         self.cb2.move(20,60)
         self.cb2.activated[str].connect(self.onActivated2)
         self.btn4_group.append(self.cb2)
         
         self.tb3 = QTextBrowser(self)
+        self.tb3.resize(500,400)
+        self.tb3.move(20,100)
         self.tb3.setHidden(True)
         self.tb3.setAcceptRichText(True)
         self.tb3.setOpenExternalLinks(True)
-        self.tb3.move(20,150)
         self.btn4_group.append(self.tb3)
 
         self.tb4 = QTextBrowser(self)
+        self.tb4.resize(500,400)
+        self.tb4.move(20,100)
         self.tb4.setHidden(True)
         self.tb4.setAcceptRichText(True)
         self.tb4.setOpenExternalLinks(True)
-        self.tb4.move(20,150)
+        
         for p in  self.wificonnectlist:
             self.tb4.append(p[0].__str__() + " : " + p[1].__str__() + " : " + p[2].__str__())
         self.btn5_group.append(self.tb4)
@@ -242,7 +281,7 @@ KT_GiGA_E955\nKT_GiGA_FDE9\nFREE_U+zone\nKT_GiGA_5G_Wave2_7328\nKT_GiGA_5G_Wave2
     def onActivated2(self,text):
         self.tb3.clear()
         for p in self.wificonnect[text]:
-            self.tb3.append(p[0].__str__() + ":" + p[1].__str__())
+            self.tb3.append(p)
 
 
 if __name__ == '__main__':
